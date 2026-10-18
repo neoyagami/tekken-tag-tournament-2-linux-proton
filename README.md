@@ -41,7 +41,7 @@ Después de completar el instalador:
 ./ttt2-linux run
 ```
 
-Para añadirlo al menú de aplicaciones del escritorio:
+Para añadirlo al menú de aplicaciones y crear un icono en el escritorio:
 
 ```bash
 ./ttt2-linux install-desktop

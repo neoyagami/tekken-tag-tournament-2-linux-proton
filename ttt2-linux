@@ -198,6 +198,7 @@ show_status() {
 install_desktop_entry() {
     local applications_dir="${XDG_DATA_HOME:-$HOME/.local/share}/applications"
     local destination="$applications_dir/ttt2-linux.desktop"
+    local desktop_dir desktop_link
     [[ -f "$DESKTOP_TEMPLATE" ]] || die "Falta la plantilla: $DESKTOP_TEMPLATE"
     need_command sed
     need_command install
@@ -208,6 +209,15 @@ install_desktop_entry() {
         update-desktop-database "$applications_dir" >/dev/null 2>&1 || true
     fi
     info "Acceso instalado en $destination"
+
+    desktop_dir="$(xdg-user-dir DESKTOP 2>/dev/null || true)"
+    desktop_dir="${desktop_dir:-$HOME/Desktop}"
+    desktop_link="$desktop_dir/Tekken Tag Tournament 2.desktop"
+    install -Dm755 "$destination" "$desktop_link"
+    if command -v gio >/dev/null 2>&1; then
+        gio set "$desktop_link" metadata::trusted true >/dev/null 2>&1 || true
+    fi
+    info "Acceso de escritorio instalado en $desktop_link"
 }
 
 case "${1:-run}" in
