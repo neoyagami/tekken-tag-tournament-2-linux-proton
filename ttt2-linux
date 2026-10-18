@@ -1,0 +1,219 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+readonly APP_VERSION="v0.1.6"
+readonly INSTALLER_NAME="ttt2_setup.exe"
+readonly INSTALLER_SHA256="2e7813b0df639b1bb49b88ec0f30e1ee61572087fd96bed2a87250f6ac14f666"
+readonly INSTALLER_URL="https://github.com/shihabal3amri/tekken-tag-tournament-2-pc/releases/download/${APP_VERSION}/${INSTALLER_NAME}"
+readonly TU3_NAME="TU_174Q22P_0000008000000.00000000000O2"
+readonly SCRIPT_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+readonly DATA_ROOT="${TTT2_DATA_ROOT:-$SCRIPT_ROOT/data}"
+readonly CACHE_ROOT="${TTT2_CACHE_ROOT:-$SCRIPT_ROOT/cache}"
+readonly PREFIX_ROOT="$DATA_ROOT/proton-prefix"
+readonly LOG_ROOT="$DATA_ROOT/logs"
+readonly INSTALLER_CACHE="$CACHE_ROOT/${APP_VERSION}-${INSTALLER_NAME}"
+readonly DESKTOP_TEMPLATE="$SCRIPT_ROOT/TTT2-Linux.desktop.in"
+
+die() {
+    printf 'Error: %s\n' "$*" >&2
+    exit 1
+}
+
+info() {
+    printf '[TTT2 Linux] %s\n' "$*" >&2
+}
+
+need_command() {
+    command -v "$1" >/dev/null 2>&1 || die "Falta el comando '$1'."
+}
+
+find_steam_root() {
+    local candidate
+    for candidate in \
+        "$HOME/.local/share/Steam" \
+        "$HOME/.steam/root" \
+        "$HOME/.var/app/com.valvesoftware.Steam/.local/share/Steam"; do
+        if [[ -d "$candidate" ]]; then
+            printf '%s\n' "$candidate"
+            return
+        fi
+    done
+    die "No encontré una instalación de Steam."
+}
+
+find_proton() {
+    if [[ -n "${TTT2_PROTON:-}" ]]; then
+        [[ -x "$TTT2_PROTON" ]] || die "TTT2_PROTON no apunta a un ejecutable: $TTT2_PROTON"
+        printf '%s\n' "$TTT2_PROTON"
+        return
+    fi
+
+    local steam_root candidate
+    steam_root="$(find_steam_root)"
+    for candidate in \
+        "$steam_root/steamapps/common/Proton - Experimental/proton" \
+        "$steam_root/steamapps/common/Proton CachyOS/proton" \
+        "$steam_root/compatibilitytools.d/Proton-CachyOS/proton" \
+        "$steam_root/steamapps/common/Proton 10.0/proton" \
+        "$SCRIPT_ROOT/../tk/data/runtime/Proton - Experimental/proton"; do
+        if [[ -x "$candidate" ]]; then
+            printf '%s\n' "$candidate"
+            return
+        fi
+    done
+    die "No encontré Proton. Instala Proton Experimental o define TTT2_PROTON=/ruta/proton."
+}
+
+find_iso() {
+    local candidate="${TTT2_ISO:-$SCRIPT_ROOT/Tekken Tag Tournament 2 (USA, Europe).iso}"
+    [[ -f "$candidate" ]] || die "No encontré la ISO. Define TTT2_ISO=/ruta/juego.iso."
+    realpath "$candidate"
+}
+
+find_tu3() {
+    local candidate="${TTT2_TU3:-$SCRIPT_ROOT/$TU3_NAME}"
+    [[ -f "$candidate" ]] || die "No encontré TU3 ($TU3_NAME). Define TTT2_TU3=/ruta/TU3."
+    [[ "$(basename -- "$candidate")" == "$TU3_NAME" ]] || info \
+        "Aviso: el nombre no coincide con TU3; el instalador comprobará su contenido."
+    realpath "$candidate"
+}
+
+verify_installer() {
+    local installer="$1" actual
+    actual="$(sha256sum "$installer" | awk '{print $1}')"
+    [[ "$actual" == "$INSTALLER_SHA256" ]] || die \
+        "SHA-256 incorrecto para '$installer'. Esperado: $INSTALLER_SHA256; obtenido: $actual"
+}
+
+find_local_installer() {
+    local candidate
+    for candidate in \
+        "$SCRIPT_ROOT/$INSTALLER_NAME" \
+        "$HOME/Downloads/$INSTALLER_NAME" \
+        "$HOME/Descargas/$INSTALLER_NAME"; do
+        if [[ -f "$candidate" ]]; then
+            printf '%s\n' "$candidate"
+            return
+        fi
+    done
+    return 1
+}
+
+obtain_installer() {
+    local local_installer=""
+    need_command sha256sum
+    mkdir -p "$CACHE_ROOT"
+
+    if [[ -f "$INSTALLER_CACHE" ]]; then
+        verify_installer "$INSTALLER_CACHE"
+        printf '%s\n' "$INSTALLER_CACHE"
+        return
+    fi
+
+    local_installer="$(find_local_installer || true)"
+    if [[ -n "$local_installer" ]]; then
+        verify_installer "$local_installer"
+        cp --reflink=auto "$local_installer" "$INSTALLER_CACHE"
+        printf '%s\n' "$INSTALLER_CACHE"
+        return
+    fi
+
+    need_command curl
+    info "Descargando el instalador oficial ${APP_VERSION}..."
+    if ! curl --fail --location --progress-bar --output "$INSTALLER_CACHE.part" "$INSTALLER_URL"; then
+        rm -f -- "$INSTALLER_CACHE.part"
+        die "No se pudo descargar. Descarga $INSTALLER_NAME desde $INSTALLER_URL y colócalo junto a este script."
+    fi
+    mv -- "$INSTALLER_CACHE.part" "$INSTALLER_CACHE"
+    verify_installer "$INSTALLER_CACHE"
+    printf '%s\n' "$INSTALLER_CACHE"
+}
+
+find_game() {
+    local drive_c="$PREFIX_ROOT/pfx/drive_c"
+    [[ -d "$drive_c" ]] || return 1
+    find "$drive_c" -type f -iname 'Tekken Tag Tournament 2.exe' -print -quit 2>/dev/null
+}
+
+run_with_proton() {
+    local executable="$1" proton steam_root log_enabled
+    proton="$(find_proton)"
+    steam_root="$(find_steam_root)"
+    log_enabled="${TTT2_PROTON_LOG:-1}"
+    mkdir -p "$PREFIX_ROOT" "$LOG_ROOT"
+
+    cd "$(dirname -- "$executable")"
+    env \
+        STEAM_COMPAT_CLIENT_INSTALL_PATH="$steam_root" \
+        STEAM_COMPAT_DATA_PATH="$PREFIX_ROOT" \
+        PROTON_USE_XALIA="${TTT2_USE_XALIA:-0}" \
+        PROTON_LOG_DIR="$LOG_ROOT" \
+        PROTON_LOG="$log_enabled" \
+        "$proton" run "$executable"
+}
+
+install_game() {
+    local installer iso tu3
+    installer="$(obtain_installer)"
+    iso="$(find_iso)"
+    tu3="$(find_tu3)"
+
+    info "ISO para seleccionar: $(printf '%s' "$iso" | sed 's|/|\\|g; s|^|Z:|')"
+    info "TU3 para seleccionar: $(printf '%s' "$tu3" | sed 's|/|\\|g; s|^|Z:|')"
+    info "Elige la carpeta de instalación predeterminada dentro de C: del prefijo."
+    run_with_proton "$installer"
+}
+
+run_game() {
+    local game
+    game="$(find_game || true)"
+    [[ -n "$game" ]] || die "El juego aún no está instalado. Ejecuta: ./ttt2-linux install"
+    info "Iniciando $(basename -- "$game")..."
+    run_with_proton "$game"
+}
+
+show_status() {
+    local proton iso tu3 installer="" game="" online="sin comprobar"
+    proton="$(find_proton)"
+    iso="$(find_iso)"
+    tu3="$(find_tu3)"
+    installer="$(find_local_installer || true)"
+    [[ -z "$installer" && -f "$INSTALLER_CACHE" ]] && installer="$INSTALLER_CACHE"
+    game="$(find_game || true)"
+    local game_log="$PREFIX_ROOT/pfx/drive_c/users/steamuser/AppData/Local/TTT2Recomp/log.txt"
+    if [[ -f "$game_log" ]] && grep -Fq '[steam] running as ' "$game_log"; then
+        online="Steamworks activo (Spacewar/App 480)"
+    fi
+
+    printf 'Proton:     %s\n' "$proton"
+    printf 'ISO:        %s\n' "$iso"
+    printf 'TU3:        %s\n' "$tu3"
+    printf 'Instalador: %s\n' "${installer:-pendiente}"
+    printf 'Juego:      %s\n' "${game:-pendiente de instalación}"
+    printf 'Online:     %s\n' "$online"
+    printf 'Prefijo:    %s\n' "$PREFIX_ROOT"
+    printf 'Logs:       %s\n' "$LOG_ROOT"
+}
+
+install_desktop_entry() {
+    local applications_dir="${XDG_DATA_HOME:-$HOME/.local/share}/applications"
+    local destination="$applications_dir/ttt2-linux.desktop"
+    [[ -f "$DESKTOP_TEMPLATE" ]] || die "Falta la plantilla: $DESKTOP_TEMPLATE"
+    need_command sed
+    need_command install
+    mkdir -p "$applications_dir"
+    sed "s|@SCRIPT_ROOT@|$SCRIPT_ROOT|g" "$DESKTOP_TEMPLATE" >"$destination"
+    chmod 0644 "$destination"
+    if command -v update-desktop-database >/dev/null 2>&1; then
+        update-desktop-database "$applications_dir" >/dev/null 2>&1 || true
+    fi
+    info "Acceso instalado en $destination"
+}
+
+case "${1:-run}" in
+    install) install_game ;;
+    run) run_game ;;
+    status) show_status ;;
+    install-desktop) install_desktop_entry ;;
+    *) die "Uso: $0 [install|run|status|install-desktop]" ;;
+esac
