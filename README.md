@@ -47,6 +47,10 @@ Para añadirlo al menú de aplicaciones y crear un icono en el escritorio:
 ./ttt2-linux install-desktop
 ```
 
+Si están disponibles `wrestool` e `icotool`, el comando extrae automáticamente
+el icono de 256×256 del ejecutable instalado. La imagen queda en `data/icons/`
+y no se incorpora al repositorio.
+
 No es necesario añadir el ejecutable manualmente como juego ajeno a Steam. El
 port inicia un proceso auxiliar, carga `steam_api64.dll` y se conecta al cliente
 nativo de Steam como Spacewar (App 480) incluso cuando se lanza con este script.

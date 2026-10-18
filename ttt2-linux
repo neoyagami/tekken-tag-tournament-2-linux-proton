@@ -198,12 +198,29 @@ show_status() {
 install_desktop_entry() {
     local applications_dir="${XDG_DATA_HOME:-$HOME/.local/share}/applications"
     local destination="$applications_dir/ttt2-linux.desktop"
-    local desktop_dir desktop_link
+    local desktop_dir desktop_link game="" icon="applications-games" icon_dir icon_png extracted_png
     [[ -f "$DESKTOP_TEMPLATE" ]] || die "Falta la plantilla: $DESKTOP_TEMPLATE"
     need_command sed
     need_command install
+
+    game="$(find_game || true)"
+    if [[ -n "$game" ]] && command -v wrestool >/dev/null 2>&1 && command -v icotool >/dev/null 2>&1; then
+        icon_dir="$DATA_ROOT/icons"
+        icon_png="$icon_dir/ttt2.png"
+        mkdir -p "$icon_dir"
+        if wrestool -x -t 14 -n 1 -o "$icon_dir/ttt2.ico" "$game" \
+            && icotool -x -o "$icon_dir" "$icon_dir/ttt2.ico"; then
+            extracted_png="$(find "$icon_dir" -maxdepth 1 -type f -name '*_256x256x*.png' -print -quit)"
+            if [[ -n "$extracted_png" ]]; then
+                install -m644 "$extracted_png" "$icon_png"
+                icon="$icon_png"
+            fi
+        fi
+    fi
+
     mkdir -p "$applications_dir"
-    sed "s|@SCRIPT_ROOT@|$SCRIPT_ROOT|g" "$DESKTOP_TEMPLATE" >"$destination"
+    sed -e "s|@SCRIPT_ROOT@|$SCRIPT_ROOT|g" -e "s|@ICON@|$icon|g" \
+        "$DESKTOP_TEMPLATE" >"$destination"
     chmod 0644 "$destination"
     if command -v update-desktop-database >/dev/null 2>&1; then
         update-desktop-database "$applications_dir" >/dev/null 2>&1 || true
