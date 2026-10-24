@@ -10,14 +10,14 @@ incluye el juego, el instalador, Title Updates, Proton ni otros binarios.
 
 - Una copia propia de `Tekken Tag Tournament 2 (USA, Europe)` para Xbox 360.
 - Title Update 3: `TU_174Q22P_0000008000000.00000000000O2`.
-- `ttt2_setup.exe` v0.1.6 de la release oficial.
+- `ttt2_setup.exe` v0.1.7 de la release oficial.
 - Steam y Proton Experimental.
 - Al menos 13 GB libres para la instalación.
 
 El launcher solo acepta el instalador cuyo SHA-256 oficial es:
 
 ```text
-2e7813b0df639b1bb49b88ec0f30e1ee61572087fd96bed2a87250f6ac14f666
+2649442f5a82122bbb432cad93f612b241aa842c4dfb68330a7ad14b97638941
 ```
 
 ## Uso
@@ -75,19 +75,23 @@ con Proton Experimental 11 y una NVIDIA RTX 4070. Funcionan la identificación
 de la cuenta, consulta de sesiones, creación de lobbies y Steam Networking. Aún
 falta comprobar una pelea completa entre dos equipos Linux distintos.
 
-Upstream solo implementa `ONLINE MODE` → `PLAYER MATCH`. Ambos jugadores deben
-usar la misma versión del port; el anfitrión crea una sesión y el otro jugador
-la busca. Las invitaciones directas de Steam aún figuran como no probadas.
+La v0.1.7 incorpora rollback netcode, invitaciones de amigos desde las salas y
+servidores comunitarios para Ranked Match, leaderboards, equipos, replays y
+ghosts. Ambos jugadores deben usar la misma versión del port.
 
 ## Resultado comprobado
 
-- Instalador v0.1.6 ejecutado correctamente mediante Proton.
+- Instalador v0.1.7 ejecutado correctamente mediante Proton.
 - ISO y TU3 validados y 13 GB de datos generados.
 - D3D11 traducido mediante DXVK en la RTX 4070.
 - Salida XAudio2 funcional.
 - Perfil local, menú principal y configuración de controles funcionales.
 - Steamworks inicializado como Spacewar/App 480.
 - NAT abierto, búsqueda de sesiones y publicación de lobbies funcionales.
+- Runtime de rollback y nueva entrada `SERVER` confirmados en v0.1.7.
+- La precarga bajo Proton conserva miles de shaders DXBC utilizables, pero
+  `vkd3d-shader` descarta algunas variantes con avisos `Invalid shader`; el
+  juego inicia y carga la caché sin recompilar shaders durante el menú.
 - Xalia produce excepciones de identificador de ventana en el instalador; se
   desactiva por defecto con `PROTON_USE_XALIA=0`.
 

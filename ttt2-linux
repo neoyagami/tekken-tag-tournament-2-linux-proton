@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-readonly APP_VERSION="v0.1.6"
+readonly APP_VERSION="v0.1.7"
 readonly INSTALLER_NAME="ttt2_setup.exe"
-readonly INSTALLER_SHA256="2e7813b0df639b1bb49b88ec0f30e1ee61572087fd96bed2a87250f6ac14f666"
+readonly INSTALLER_SHA256="2649442f5a82122bbb432cad93f612b241aa842c4dfb68330a7ad14b97638941"
 readonly INSTALLER_URL="https://github.com/shihabal3amri/tekken-tag-tournament-2-pc/releases/download/${APP_VERSION}/${INSTALLER_NAME}"
 readonly TU3_NAME="TU_174Q22P_0000008000000.00000000000O2"
 readonly SCRIPT_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
@@ -177,8 +177,11 @@ show_status() {
     proton="$(find_proton)"
     iso="$(find_iso)"
     tu3="$(find_tu3)"
-    installer="$(find_local_installer || true)"
-    [[ -z "$installer" && -f "$INSTALLER_CACHE" ]] && installer="$INSTALLER_CACHE"
+    if [[ -f "$INSTALLER_CACHE" ]]; then
+        installer="$INSTALLER_CACHE"
+    else
+        installer="$(find_local_installer || true)"
+    fi
     game="$(find_game || true)"
     local game_log="$PREFIX_ROOT/pfx/drive_c/users/steamuser/AppData/Local/TTT2Recomp/log.txt"
     if [[ -f "$game_log" ]] && grep -Fq '[steam] running as ' "$game_log"; then
